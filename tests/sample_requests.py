@@ -1,6 +1,7 @@
 import asyncio
 import time
 from collections import Counter
+import json
 
 import httpx
 
@@ -343,6 +344,9 @@ async def run_tests():
             print("\n" + "=" * 80)
             print(f"TEST: {test['name']}")
             print("=" * 80)
+            print(f"REQUEST PAYLOAD:")
+            print(json.dumps(test["payload"], indent=2))
+            print("-" * 80)
 
             start = time.perf_counter()
 
@@ -354,37 +358,40 @@ async def run_tests():
 
                 duration = (time.perf_counter() - start) * 1000
 
-                print(
-                    f"STATUS: {response.status_code} | "
-                    f"TIME: {duration:.2f} ms"
-                )
-
+                print(f"STATUS: {response.status_code} | TIME: {duration:.2f} ms")
+                print("-" * 80)
+                
                 if response.status_code == 200:
                     data = response.json()
+                    print(f"RESPONSE JSON:")
+                    print(json.dumps(data, indent=2))
+                    
                     action = data.get("action")
                     reply = data.get("drafted_reply", "")
                     stats["actions"][action] += 1
 
                     # Patch 6: Validation for Pricing/Availability Fallbacks
-                    # Since is_fallback is internalized, we verify by reply content
                     if "Villa B1 is available for April 20–24" in reply:
                         stats["fallback_activations"]["deterministic_safe"] += 1
-                        print("DEBUG: Availability fallback verified via content.")
+                        print("\n✓ Availability fallback verified via content.")
                     
                     if "base rate is INR 18,000" in reply:
                         stats["fallback_activations"]["deterministic_safe"] += 1
-                        print("DEBUG: Pricing fallback verified via content.")
+                        print("\n✓ Pricing fallback verified via content.")
 
-                    # Patch 6: Complaint Escalation Verification
-                    if test["name"].endswith("Complaint") and action != "escalate":
-                        print(f"WARNING: Complaint '{test['name']}' did not escalate properly!")
+                    # Complaint escalation verification
+                    if "Complaint" in test["name"] and action != "escalate":
+                        print(f"\n⚠ WARNING: Complaint '{test['name']}' did not escalate properly!")
 
-                    # Internal metadata fields are no longer in public response
-                    # Verification is now content-based as implemented above.
-                    pass
+                else:
+                    print(f"ERROR RESPONSE:")
+                    print(f"Status: {response.status_code}")
+                    print(f"Body: {response.text}")
 
             except Exception as e:
-                print(f"ERROR: {e}")
+                print(f"EXCEPTION: {e}")
+            
+            print("=" * 80)
 
 
 # =========================================================
@@ -412,20 +419,25 @@ async def concurrency_test():
                 "property_id": "villa-b1"
             }
 
+            print(f"\n--- CONCURRENT REQUEST {index} ---")
+            print(f"Payload: {json.dumps(payload, indent=2)}")
+            
             response = await client.post(
                 f"{BASE_URL}/webhook/message",
                 json=payload
             )
 
-            print(
-                f"Request {index} | "
-                f"Status: {response.status_code}"
-            )
-
+            print(f"Request {index} | Status: {response.status_code}")
+            
             if response.status_code == 200:
-                stats["actions"][
-                    response.json().get("action")
-                ] += 1
+                data = response.json()
+                print(f"Response {index}:")
+                print(json.dumps(data, indent=2))
+                stats["actions"][data.get("action")] += 1
+            else:
+                print(f"Error Response {index}: {response.text}")
+            
+            print("-" * 40)
 
         await asyncio.gather(
             *[send_request(i) for i in range(10)]
@@ -452,29 +464,6 @@ def print_summary():
     for action, count in stats["actions"].items():
         print(f"- {action}: {count}")
 
-    print("\nClaude Failure Categories:")
-
-    if not stats["claude_failures"]:
-        print(
-            "- None "
-            "(All requests succeeded or were handled locally)"
-        )
-
-    for failure_type, count in stats["claude_failures"].items():
-        print(f"- {failure_type}: {count}")
-
-    print("\nFallback Metrics:")
-
-    print(
-        "- Deterministic Safe Activations: "
-        f"{stats['fallback_activations']['deterministic_safe']}"
-    )
-
-    print(
-        "- Suppressed Unsafe Activations: "
-        f"{stats['fallback_activations']['suppressed_unsafe']}"
-    )
-
     print("\nNote:")
     print(
         "For detailed decision rationale and internal "
@@ -490,7 +479,8 @@ def print_summary():
 
 if __name__ == "__main__":
 
-    print("\nNISTULA BACKEND TEST SUITE")
+    print("\n🚀 NISTULA BACKEND TEST SUITE")
+    print("📡 Showing full JSON responses for all requests\n")
 
     asyncio.run(run_tests())
     asyncio.run(concurrency_test())

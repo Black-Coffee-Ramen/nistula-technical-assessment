@@ -1,206 +1,280 @@
-# Nistula-Technical-Assessment
+# Nistula Unified Guest Messaging Backend
 
-A production-inspired backend system for unified guest messaging, AI-assisted response generation, and operational escalation handling.
+A FastAPI backend for receiving guest messages from multiple channels, normalizing them into a single internal schema, generating AI-assisted draft replies with Claude, and routing each response through a confidence-based safety decision.
 
-This project was built as part of the Nistula technical assessment and focuses on:
+This project was built for the Nistula technical assessment, but the implementation is intentionally written like a small production service rather than a throwaway demo. The core focus is not only "can the API return a reply?" but also:
 
-* Unified guest message ingestion
-* Hybrid AI + deterministic classification
-* AI-assisted hospitality replies
-* Confidence scoring and escalation logic
-* PostgreSQL schema design for scalable messaging workflows
+- What happens when the AI provider fails?
+- Which messages are safe to auto-send?
+- Which messages need human review?
+- How can another engineer understand and extend the system quickly?
+- How do we preserve operational safety in a hospitality context?
 
----
+## What This System Does
 
-# Production-Grade Readability Refactor (May 2026)
+The backend exposes a single webhook endpoint:
 
-The codebase has undergone a comprehensive maintainability refactor to ensure long-term observability and structural clarity. Key enhancements include:
-*   **Decoupled Service Architecture**: Logic for classification, AI interaction, and fallback generation is now fully encapsulated in specialized service classes.
-*   **Structured Observability**: Standardized logging with correlation IDs, professional docstrings, and internalized diagnostic metadata.
-*   **Resilient Fallbacks**: Deterministic, property-aware responses for critical guest queries (WiFi, check-in, pricing, availability) that activate automatically during AI service disruptions.
-*   **Strict Escalation Routing**: Precise threshold compliance (Complaints/Low confidence → Escalate) to ensure operational safety.
-*   **Self-Documenting API**: Clean, consumer-facing Pydantic models optimized for Swagger/OpenAPI documentation.
+```http
+POST /webhook/message
+```
 
----
+It accepts guest messages from:
 
-# Tech Stack
+- WhatsApp
+- Booking.com
+- Airbnb
+- Instagram
+- Direct channels
 
-| Layer              | Technology                        |
-| :----------------- | :-------------------------------- |
-| Backend API        | FastAPI                           |
-| AI Integration     | Anthropic Claude API              |
-| Validation         | Pydantic                          |
-| Database Design    | PostgreSQL                        |
-| Environment Config | python-dotenv / pydantic-settings |
+Each inbound payload is validated, classified, normalized, passed through a Claude-backed reply generator, scored for confidence, and routed to one of three operational actions:
 
----
+| Action | Meaning |
+| :-- | :-- |
+| `auto_send` | Safe enough to send without human review |
+| `agent_review` | Useful draft, but a human should verify it |
+| `escalate` | High-risk or low-confidence message requiring urgent attention |
 
-# Part 1 — Guest Message Handler
+The API response intentionally stays small and assignment-aligned:
 
-## Problem Statement
+```json
+{
+  "message_id": "uuid",
+  "query_type": "pre_sales_availability",
+  "drafted_reply": "Hi Rahul! Great news...",
+  "confidence_score": 0.91,
+  "action": "auto_send"
+}
+```
 
-Nistula receives guest messages from multiple platforms including:
+Internal details such as AI failure types, fallback reasons, and routing diagnostics are kept in logs, not exposed in the public API contract.
 
-* WhatsApp
-* Airbnb
-* Booking.com
-* Instagram
-* Direct channels
+## Why This Is More Than a Basic Webhook
 
-The system normalizes inbound messages into a unified internal schema, classifies guest intent, generates AI-assisted replies, and determines whether a response should be automatically sent, reviewed by an agent, or escalated.
+Guest messaging is operationally sensitive. A bad response can create real work for the hospitality team, frustrate a guest, or accidentally promise something the business cannot honor.
 
----
+The system therefore treats AI output as helpful but not authoritative. Claude can draft replies, but the backend owns:
 
-# Architecture Flow
+- input validation
+- query classification
+- property context control
+- fallback behavior
+- confidence scoring
+- escalation decisions
+- observability
+
+That separation is deliberate. It keeps the service useful when Claude works, and safe when Claude is unavailable, rate-limited, misconfigured, or returns malformed output.
+
+## Architecture Overview
 
 ```mermaid
 flowchart TD
-
-    A[Webhook Request JSON]
-    B[Input Validation<br/>Pydantic]
-    C[Normalization<br/>UUID + Internal Schema]
-
-    D[Hybrid Classification]
-
-    E[Rule-based Matching]
-    F[Claude Fallback]
-
-    G[AI Reply Generation]
-    H[Confidence Scoring Engine]
-    I[Action Decision Logic]
-    J[Structured JSON Response]
-
-    A --> B
-    B --> C
-    C --> D
-
-    D --> E
-    D --> F
-
-    E --> G
-    F --> G
-
-    G --> H
+    A["Webhook request"] --> B["Pydantic validation"]
+    B --> C["Message normalization"]
+    C --> D["Hybrid query classification"]
+    D --> E["Claude reply generation"]
+    E --> F{"Claude successful?"}
+    F -->|"yes"| G["Validate AI JSON"]
+    F -->|"no"| H["Deterministic fallback decision"]
+    G --> I["Confidence scoring"]
     H --> I
-    I --> J
+    I --> J["Action routing"]
+    J --> K["Minimal API response"]
+    J --> L["Structured logs with message_id"]
 ```
 
----
+### Request Lifecycle
 
-# Design Philosophy
+1. Validate the incoming payload with Pydantic.
+2. Classify the message using fast deterministic rules.
+3. Normalize it into the unified internal schema.
+4. Send the normalized message and property context to Claude.
+5. Validate the AI response before trusting it.
+6. If Claude fails, attempt deterministic factual fallback only when safe.
+7. Score the response using business-risk-aware confidence logic.
+8. Return the drafted reply and routing action.
+9. Log the full decision path using the generated `message_id`.
 
-The implementation prioritizes:
+## Tech Stack
 
-* Deterministic business rules
-* Graceful degradation
-* Operational clarity
-* Maintainability
-* Human-in-the-loop escalation
+| Layer | Technology |
+| :-- | :-- |
+| API framework | FastAPI |
+| Validation | Pydantic |
+| AI provider | Anthropic Claude API |
+| Environment config | `python-dotenv`, `pydantic-settings` |
+| Test harness | `httpx`, async Python scripts |
+| Database design | PostgreSQL schema in `schema.sql` |
 
-The system is intentionally designed to remain operational even if external AI services fail.
+## Project Structure
 
----
+```text
+nistula-technical-assessment/
+  app/
+    config/
+      constants.py
+      settings.py
+    models/
+      message.py
+    routes/
+      webhook.py
+    schemas/
+      message.py
+    services/
+      classifier.py
+      claude.py
+      fallback.py
+      scorer.py
+    main.py
+  screenshots/
+  tests/
+    sample_requests.py
+    test_fallback.py
+  schema.sql
+  thinking.md
+  requirements.txt
+  .env.example
+  README.md
+```
 
-# Key Features
+## API Documentation
 
-## Hybrid Classification Engine
+FastAPI automatically generates interactive Swagger documentation at:
 
-The system uses a hybrid classification strategy:
+```text
+http://127.0.0.1:8000/docs
+```
 
-| Approach                  | Purpose                                                        |
-| :------------------------ | :------------------------------------------------------------- |
-| Rule-based Classification | Fast, deterministic handling for common queries and complaints |
-| Claude Fallback           | Handles ambiguous or nuanced guest messages                    |
+This is useful for manually trying the webhook, inspecting request and response schemas, and confirming that internal debug fields are not part of the public API contract.
 
-This balances:
+![Swagger documentation](./screenshots/swagger_doc.png)
 
-* latency,
-* operational reliability,
-* and API cost efficiency.
+## Setup and Local Development
 
----
+### Prerequisites
 
-## Graceful AI Degradation
+- Python 3.11 or newer
+- `pip`
+- A terminal or PowerShell
+- An Anthropic API key for live Claude calls
 
-A core engineering principle of the project is resilience under partial failure.
+The system still runs without a working Claude balance because it includes graceful fallback handling. A low-credit or expired key will produce logged AI failures, but the API should continue returning safe responses.
 
-If the Claude API becomes unavailable:
+### 1. Clone or Open the Project
 
-* the request still succeeds,
-* a safe hospitality fallback response is generated,
-* confidence is reduced,
-* and the message is routed for human review or escalation.
+```bash
+cd "C:\Users\athiy\Downloads\Semester-8\Personal Projects\nistula-technical-assessment"
+```
 
-This prevents guest-facing API failures and ensures operational continuity.
+If you are running on macOS or Linux, use the equivalent path where the project is stored.
 
-### Graceful AI Failure Handling
+### 2. Create a Virtual Environment
 
-The system implements an intelligent fallback strategy to maintain operational safety when the Claude API fails or returns malformed responses.
+Windows PowerShell:
 
-#### 1. Explicit Failure Detection
-The system detects Claude failures (timeouts, API errors, JSON parsing errors) and returns a `success: False` flag. This allows the backend to take deterministic action instead of blindly trusting a generic fallback message.
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
 
-#### 2. Deterministic Factual Fallbacks
-If Claude fails but the guest query is factual (WiFi password, check-in/out times, caretaker availability), the system generates a **backend-owned trusted response** directly from the property context.
+macOS or Linux:
 
-*   **Benefit**: Guests get accurate answers to critical operational questions even during AI outages.
-*   **Safety**: These responses are generated via templates and string matching against verified property data, eliminating hallucination risk.
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
 
-#### 3. Operational Safety Safeguards
-If Claude fails and no deterministic fallback is available for the query:
-*   The system returns a generic hospitality fallback message.
-*   **Critical Safeguard**: The confidence score is forced to a low value (0.4), and the action is automatically downgraded to `agent_review` or `escalate`.
-*   **Never Auto-Send**: Generic fallback messages are **never** auto-sent to guests, preventing cold, unhelpful automated interactions.
+### 3. Install Dependencies
 
----
+```bash
+pip install -r requirements.txt
+```
 
-## Deterministic Escalation Logic
+### 4. Configure Environment Variables
 
-The backend owns business-critical decisions.
+Create a `.env` file in the project root:
 
-Examples:
+```env
+ANTHROPIC_API_KEY=your_anthropic_key_here
+PORT=8000
+DEBUG=True
+```
 
-* all complaints are escalated,
-* refund-related messages reduce confidence,
-* factual post-sales queries (WiFi/check-in) are optimized for auto-send.
+Do not commit `.env`. The repository includes `.env.example` for reference and `.gitignore` excludes real environment files.
 
----
+### 5. Start the FastAPI Server
 
-# Confidence Scoring Engine
+```bash
+uvicorn app.main:app --reload
+```
 
-Confidence scoring combines:
+Expected output:
 
-* deterministic heuristics,
-* business risk weighting,
-* and optional AI confidence signals.
+```text
+Uvicorn running on http://127.0.0.1:8000
+Application startup complete.
+```
 
-## Confidence Signals
+### 6. Check Health and Docs
 
-| Signal               | Effect                     |
-| :------------------- | :------------------------- |
-| Complaint detected   | Heavy confidence reduction |
-| Refund request       | Heavy reduction            |
-| Ambiguous wording    | Moderate reduction         |
-| Known factual query  | Confidence boost           |
-| AI fallback response | Confidence reduction       |
+Open:
 
----
+```text
+http://127.0.0.1:8000/health
+http://127.0.0.1:8000/docs
+```
 
-# Action Thresholds
+The health endpoint should return:
 
-| Confidence Score | Action         |
-| :--------------- | :------------- |
-| > 0.85           | `auto_send`    |
-| 0.60 – 0.85      | `agent_review` |
-| < 0.60           | `escalate`     |
+```json
+{
+  "status": "healthy"
+}
+```
 
-Additionally:
+### 7. Run the Automated Validation Suite
 
-* all complaints are escalated regardless of confidence.
+Keep the FastAPI server running in one terminal. In a second terminal:
 
----
+```bash
+python tests/sample_requests.py
+```
 
-# Example API Request
+The script sends many realistic payloads to `/webhook/message`, prints each request result, and summarizes routing behavior. It covers:
+
+- factual operational questions
+- availability and pricing
+- complaints
+- refund language
+- mixed-intent messages
+- typos and short messages
+- invalid property IDs
+- missing fields
+- invalid timestamps
+- concurrent requests
+
+For fallback-focused checks:
+
+```bash
+$env:PYTHONPATH="."; python tests/test_fallback.py
+```
+
+On macOS or Linux:
+
+```bash
+PYTHONPATH=. python tests/test_fallback.py
+```
+
+### Troubleshooting
+
+| Symptom | Likely cause | What to do |
+| :-- | :-- | :-- |
+| `ModuleNotFoundError: No module named 'app'` | Running a test directly without project root on `PYTHONPATH` | Run from project root with `PYTHONPATH=.` |
+| `Your credit balance is too low` | Anthropic key is valid enough to reach the API, but has no credits | This is handled gracefully; use deterministic fallback demos |
+| `401 authentication_error` | Invalid or missing API key | Check `.env` and restart the server |
+| `404 Property 'villa-x9' not found` | Unsupported property ID | Expected behavior; only `villa-b1` is implemented |
+| Empty message returns `422` | Pydantic validation | Expected behavior |
+
+## Example Request
 
 ```json
 {
@@ -213,255 +287,368 @@ Additionally:
 }
 ```
 
----
+## Unified Message Schema
 
-# Example API Response
+Before the message is sent into the AI pipeline, the webhook normalizes it into an internal shape:
 
 ```json
 {
-  "message_id": "7f2a8b3c-...",
-  "query_type": "pre_sales_availability",
-  "drafted_reply": "Hi Rahul! Great news, Villa B1 is available...",
-  "confidence_score": 0.91,
-  "action": "auto_send"
+  "message_id": "generated UUID",
+  "source": "whatsapp",
+  "guest_name": "Rahul Sharma",
+  "message_text": "Is the villa available from April 20 to 24?",
+  "timestamp": "2026-05-05T10:30:00Z",
+  "booking_ref": "NIS-2024-0891",
+  "property_id": "villa-b1",
+  "query_type": "pre_sales_availability"
 }
 ```
 
----
+This keeps downstream services independent from channel-specific webhook naming. The rest of the pipeline works with `message_text`, not raw channel payload fields.
 
-# API Endpoints
+## Query Classification
 
-| Endpoint           | Method | Purpose                        |
-| :----------------- | :----- | :----------------------------- |
-| `/webhook/message` | POST   | Process inbound guest messages |
-| `/docs`            | GET    | Swagger/OpenAPI documentation  |
-| `/health`          | GET    | Health check                   |
+The classifier maps inbound messages into the six required query types:
 
----
+| Query type | Example |
+| :-- | :-- |
+| `pre_sales_availability` | "Is the villa available on these dates?" |
+| `pre_sales_pricing` | "What is the rate for 2 adults?" |
+| `post_sales_checkin` | "What time can we check in? What is the WiFi password?" |
+| `special_request` | "Can we arrange airport pickup?" |
+| `complaint` | "The AC is not working. This is unacceptable." |
+| `general_enquiry` | "Do you allow pets? Is parking available?" |
 
-# Project Structure
+The first pass is deterministic keyword classification. This is faster, cheaper, and safer for obvious intents such as complaints, WiFi requests, and check-in questions. Claude is used for drafting and for ambiguity handling, but the backend does not depend on Claude to recognize every critical operational risk.
 
-```text
-nistula-technical-assessment/
-│
-├── app/
-│   ├── config/
-│   ├── models/
-│   ├── routes/
-│   ├── schemas/
-│   ├── services/
-│   └── main.py
-│
-├── tests/
-│   └── sample_requests.py
-│
-├── schema.sql
-├── requirements.txt
-├── thinking.md
-├── .env.example
-└── README.md
-```
+### Mixed-Intent Handling
 
----
-
-# Setup Instructions
-
-## 1. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-## 2. Configure Environment Variables
-
-Create a `.env` file using `.env.example`
-
-```env
-ANTHROPIC_API_KEY=your_api_key_here
-```
-
----
-
-## 3. Run FastAPI Server
-
-```bash
-uvicorn app.main:app --reload
-```
-
----
-
-## 4. Open Swagger Docs
+Some guest messages contain more than one intent:
 
 ```text
-http://127.0.0.1:8000/docs
+Can we check in early and what is the WiFi password?
 ```
 
----
+The WiFi portion is factual and safe. The early check-in portion depends on availability and operations. The system treats this as mixed intent and avoids blindly auto-sending a partial answer.
 
-## 5. Run Sample Tests
+![Mixed request response](./screenshots/mixed_request_response.png)
+
+That behavior is intentional. A useful system should not answer the easy half of a message while ignoring the part that needs staff confirmation.
+
+## Claude Integration
+
+The Claude service is responsible for:
+
+- building the hospitality prompt
+- injecting Villa B1 property context
+- calling `claude-sonnet-4-20250514`
+- requesting a structured JSON response
+- validating the returned JSON
+- categorizing expected API failures
+- returning a safe internal failure object when needed
+
+The prompt includes the property context from the brief:
+
+```text
+Property: Villa B1, Assagao, North Goa
+Bedrooms: 3
+Max guests: 6
+Private pool: Yes
+Check-in: 2pm
+Check-out: 11am
+Base rate: INR 18,000 per night (up to 4 guests)
+Extra guest: INR 2,000 per night per person
+WiFi password: Nistula@2024
+Caretaker: Available 8am to 10pm
+Chef on call: Yes, pre-booking required
+Availability April 20-24: Available
+Cancellation: Free up to 7 days before check-in
+```
+
+If Claude returns malformed JSON or omits `drafted_reply`, the backend rejects that AI response and falls back to a safe path. This prevents invalid AI output from breaking the public response schema.
+
+## Graceful Degradation
+
+The most important production lesson in this project is that AI availability is not guaranteed. During testing, Anthropic responded with a low-credit billing error. The code treats that as an expected external service failure, not as a reason for the guest messaging API to crash.
+
+When Claude fails, the backend chooses one of two paths.
+
+### Path 1: Deterministic Factual Fallback
+
+For low-risk factual questions that can be answered directly from trusted property context, the backend generates the reply itself.
+
+Examples:
+
+- WiFi password
+- check-in time
+- check-out time
+- cancellation policy
+
+This keeps the service useful during AI outages without hallucinating.
+
+![WiFi password fallback](./screenshots/wifi_password.png)
+
+![Check-in and WiFi handling](./screenshots/checkin_wifi.png)
+
+### Path 2: Human Review or Escalation
+
+If the message is ambiguous, sensitive, mixed, or operationally risky, the system does not pretend to know the answer. It returns a conservative reply, lowers confidence, and routes the message to a human or escalates it.
+
+This is especially important for:
+
+- complaints
+- refund requests
+- special requests
+- mixed safe and unsafe intents
+- unknown properties
+- unclear guest wording
+
+![Auto-send prevention](./screenshots/auto_send_prevention.png)
+
+## Confidence Scoring
+
+Confidence scoring is the decision engine that turns a drafted reply into an operational action.
+
+The score is not treated as an AI-only number. It combines Claude's self-reported confidence with deterministic business rules. That matters because a hospitality system should not auto-send just because a language model sounds confident.
+
+### Why Confidence Exists
+
+Different guest messages carry different operational risk.
+
+A WiFi password question is low risk because the answer is static and available in property context. A refund complaint is high risk because the wrong response can create liability, guest dissatisfaction, or operational escalation. The confidence system captures this difference.
+
+### Inputs to the Score
+
+| Signal | Effect | Reason |
+| :-- | :-- | :-- |
+| Query type | Sets the base confidence | Factual queries start safer than complaints or special requests |
+| Claude confidence | Contributes to the final score | Useful signal, but not trusted alone |
+| Ambiguity | Reduces confidence | Unclear messages need review |
+| Mixed intent | Reduces confidence | A single reply may miss part of the request |
+| Refund language | Strongly reduces confidence | Commercial remedies require human judgment |
+| Claude failure | Caps confidence | Generic fallbacks should not be auto-sent |
+| Deterministic factual fallback | Can raise confidence | The answer comes from verified property context |
+
+### Base Confidence by Query Type
+
+| Query type | Base confidence | Rationale |
+| :-- | :-- | :-- |
+| `post_sales_checkin` | High | Often factual: WiFi, check-in, check-out |
+| `pre_sales_availability` | High | Safe when context contains exact availability |
+| `pre_sales_pricing` | Medium-high | Safe for base rate, unsafe for unsupported totals |
+| `general_enquiry` | Medium | Depends on the specific question |
+| `special_request` | Lower | Usually requires operations confirmation |
+| `complaint` | Low | Always escalated |
+
+### Routing Thresholds
+
+| Confidence score | Action |
+| :-- | :-- |
+| `> 0.85` | `auto_send` |
+| `0.60 - 0.85` | `agent_review` |
+| `< 0.60` | `escalate` |
+
+Complaints always override the numeric threshold and route to `escalate`.
+
+### Why Generic AI Fallbacks Are Downgraded
+
+When Claude fails, the fallback reply may be polite but not necessarily useful:
+
+```text
+Thank you for your message. Our team has been notified and will get back to you shortly.
+```
+
+That message should not be auto-sent as if it answered the guest. The system intentionally caps confidence for generic fallbacks and routes low-confidence cases to review or escalation. This is a small but important safety decision: reliability is not just uptime, it is also refusing to automate when the answer is weak.
+
+## Operational Examples
+
+### Complaint Escalation
+
+Complaints are treated as operational events, not normal questions. Even if Claude drafts a good apology, the system still escalates the message so a human can respond and resolve the issue.
+
+![Complaint escalation](./screenshots/complaint_escalation_example.png)
+
+Another complaint example:
+
+![Complaint query](./screenshots/complain_query.png)
+
+### Pricing and Group Queries
+
+Pricing questions are handled conservatively. The system can classify and route rate questions, but avoids inventing taxes, fees, discounts, or final totals unless those values are explicitly available.
+
+![Group pricing](./screenshots/group_pricing.png)
+
+![Chef request and pricing](./screenshots/chefreq_and_pricing.png)
+
+### Human-Like Input
+
+Real guest messages contain typos, shorthand, and casual phrasing. The test suite includes human-like inputs to check whether the classification layer remains useful under imperfect wording.
+
+![Typo handling](./screenshots/human_typo_awareness.png)
+
+### Validation and Defensive Behavior
+
+The system currently supports the mock property `villa-b1`. Unknown property IDs are rejected early instead of passing "unknown property" into the AI prompt and risking hallucinated context.
+
+![Invalid villa validation](./screenshots/invalid_villa.png)
+
+## Observability
+
+Every request gets a generated `message_id`, which is used both in the API response and in logs. This makes it possible to connect:
+
+- inbound request
+- classification result
+- Claude success or failure
+- fallback decision
+- confidence score
+- final routing action
+
+![Structured logging](./screenshots/structured_logging_with_correlation_id.png)
+
+The logging strategy keeps API responses clean while preserving debugging detail internally. For example, a public response does not expose `failure_type`, but logs can still show whether Claude failed due to billing, authentication, timeout, or malformed JSON.
+
+## Automated Testing Strategy
+
+The project includes an operational validation script rather than only unit-style checks. The goal is to simulate how the webhook behaves across realistic guest messages.
+
+Run:
 
 ```bash
 python tests/sample_requests.py
 ```
 
----
+The script prints each request and response, then summarizes action distribution and fallback behavior.
 
-# Test Scenarios Verified
+Representative scenarios:
 
-| Scenario                      | Expected Outcome           |
-| :---------------------------- | :------------------------- |
-| Availability + Pricing Query  | `agent_review`             |
-| Complaint / Operational Issue | `escalate`                 |
-| WiFi / Check-in Query         | `auto_send`                |
-| Invalid Property ID           | Validation error           |
-| Claude API Failure            | Graceful fallback response |
+| Scenario | Expected behavior |
+| :-- | :-- |
+| WiFi password | Deterministic factual answer, `auto_send` |
+| Check-in time | Deterministic factual answer, `auto_send` |
+| Complaint | `escalate` |
+| Refund demand | `escalate` |
+| Mixed WiFi and early check-in | Review or escalation, not blind auto-send |
+| Unknown property | `404` validation response |
+| Missing field | `422` validation response |
+| Invalid timestamp | `422` validation response |
+| Concurrent requests | Stable request handling with unique IDs |
 
----
+The fallback-focused script checks specific safety guarantees:
 
-# Screenshots
+```bash
+PYTHONPATH=. python tests/test_fallback.py
+```
 
-## Swagger Documentation
+On Windows PowerShell:
 
-Interactive FastAPI Swagger/OpenAPI documentation showing:
+```powershell
+$env:PYTHONPATH="."; python tests/test_fallback.py
+```
 
-* webhook endpoints,
-* request/response schemas,
-* validation models,
-* and API testing interface.
+## API Endpoints
 
-![Swagger Documentation](./swagger_doc.png)
+| Endpoint | Method | Purpose |
+| :-- | :-- | :-- |
+| `/webhook/message` | `POST` | Process an inbound guest message |
+| `/health` | `GET` | Basic service health check |
+| `/docs` | `GET` | Swagger/OpenAPI documentation |
 
----
+## Error Handling
 
-## Complaint Escalation Example
+| Error case | Behavior |
+| :-- | :-- |
+| Unsupported source | `422` validation error |
+| Missing required field | `422` validation error |
+| Empty message | `422` validation error |
+| Invalid timestamp | `422` validation error |
+| Unknown property | `404` with clear detail |
+| Claude billing/auth/API failure | Safe fallback path |
+| Claude malformed JSON | Safe fallback path |
 
-Example request execution through the `/webhook/message` endpoint demonstrating:
+## PostgreSQL Schema
 
-* guest message ingestion,
-* hybrid query classification,
-* confidence scoring,
-* and operational routing (`agent_review` / escalation workflow).
-
-![Complaint Escalation Example](./complaint_escalation_example.png)
-
----
-
-## Structured Logging with Correlation IDs
-
-Structured backend logs demonstrating request lifecycle tracing using correlation IDs.
-
-The same UUID is propagated across:
-
-* request ingestion,
-* classification,
-* Claude fallback handling,
-* confidence scoring,
-* and final action decision logging.
-
-This improves observability and debugging in production-style systems.
-
-![Structured Logging](./structured_logging_with_correlation_id.png)
-
----
-
-# Part 2 — PostgreSQL Database Schema
-
-The repository also includes a production-inspired PostgreSQL schema for the unified messaging platform.
-
-File:
+Part 2 is implemented in:
 
 ```text
 schema.sql
 ```
 
----
+The schema is designed for a unified messaging platform, not just the single webhook demo.
 
-# Database Design Highlights
+### Design Highlights
 
-## Unified Messaging Model
+| Area | Design |
+| :-- | :-- |
+| Guest profiles | Central `guests` table |
+| Cross-channel identity | `guest_channel_identities` maps platform identities to guests |
+| Reservations | Linked to guests and conversations |
+| Messages | Unified inbound and outbound `messages` table |
+| AI lifecycle | Stores query type, confidence score, AI generated state, agent edits, and action taken |
 
-All inbound and outbound communication is stored in a single `messages` table for:
+### Hardest Database Design Decision
 
-* auditability,
-* analytics,
-* escalation tracking,
-* and AI performance monitoring.
+The hardest schema decision was guest identity resolution across channels. A naive design would treat `guest_name` as the identity, but that fails quickly in real systems because names are not unique and guests may contact Nistula from different platforms.
 
----
+The schema separates the person from the platform identity:
 
-## Guest Identity Resolution
+- `guests` represents the logical guest.
+- `guest_channel_identities` stores WhatsApp, Airbnb, Booking.com, Instagram, or direct identifiers.
 
-The schema separates:
+This adds some complexity, but it gives the platform a realistic path toward guest merging and cross-channel conversation history without rewriting the core schema.
 
-* logical guest profiles,
-* from platform-specific channel identities.
+## Thinking Question
 
-Tables:
+Part 3 is answered in:
 
-* `guests`
-* `guest_channel_identities`
+```text
+thinking.md
+```
 
-This supports future cross-platform identity merging without requiring schema refactoring.
+The answer focuses on the 3am hot-water complaint scenario: immediate guest response, operational escalation, no-response fallback, and longer-term pattern detection after repeated Villa B1 hot-water complaints.
 
----
+## Key Engineering Tradeoffs
 
-## AI Lifecycle Tracking
+### Rule-Based Classification Plus Claude
 
-The schema tracks:
+Pure AI classification would be flexible but harder to reason about during failures. Pure keyword logic would be reliable but brittle. The hybrid approach keeps obvious cases deterministic while still allowing AI assistance for nuance.
 
-* AI-generated drafts,
-* agent edits,
-* confidence scores,
-* escalation states,
-* and action decisions.
+### Conservative Automation
 
-This creates a clear operational feedback loop for future AI optimization.
+The system is intentionally cautious. It prefers human review over unsafe auto-send when a message is ambiguous, mixed, sensitive, or based on unavailable information.
 
----
+### Deterministic Fallbacks Instead of Fake AI
 
-# Hardest Design Decision
+When Claude fails, the backend does not pretend the AI succeeded. It either answers from verified context or routes to a human. This makes the system honest and operationally safer.
 
-The most difficult architectural decision was modeling guest identity across multiple communication channels despite weak webhook identifiers.
+### Minimal Public Response
 
-A naive approach would assume `guest_name` uniqueness, which breaks immediately in real-world systems.
+The response schema follows the assessment contract exactly. Internal diagnostics stay in logs so API consumers receive a clean response while engineers still get observability.
 
-Instead, the schema separates:
+## Known Limitations
 
-* guest identity,
-* from source-specific channel identities.
+- Only the mock `villa-b1` property context is implemented.
+- The system selects one primary query type, even when mixed intent is detected internally.
+- There is no persistent database integration in Part 1.
+- Guest identity resolution is designed in SQL but not wired into the webhook.
+- Pricing handling avoids calculating final totals unless all required values are explicitly available.
+- Confidence scoring is heuristic rather than statistically calibrated.
 
-This introduces moderate complexity but provides a scalable path for future identity resolution and guest merging workflows.
+## Future Improvements
 
----
+Given more time, I would extend the system with:
 
-# Known Limitations
+- persisted conversations and message history
+- retrieval of reservation context before drafting
+- richer multi-intent response planning
+- calibrated confidence scoring from historical agent edits
+- incident creation for complaints
+- notification workflows for urgent operational issues
+- scheduled maintenance signals from repeated complaint patterns
 
-* Only `villa-b1` mock property context is implemented
-* Current implementation selects a single primary query type
-* No persistent database integration in Part 1
-* Guest identity resolution is limited by inbound payload structure
-* Confidence scoring uses deterministic heuristics rather than ML calibration
+I would avoid adding queues, auth, or microservice infrastructure until the core workflow needs them. For this assessment, the priority is correctness, safety, and readable orchestration.
 
----
+## Final Notes
 
-# Future Improvements
+This backend is designed around a simple principle: AI can help draft, but the system must own the operational decision.
 
-Potential future extensions include:
-
-* persistent database integration,
-* conversation history retrieval,
-* async processing queues,
-* retrieval-augmented response generation,
-* advanced multi-intent classification,
-* and automated maintenance/escalation workflows.
-
----
-
-# Final Notes
-
-This implementation focuses on:
-
-* operational reliability,
-* maintainable backend architecture,
-* deterministic business safeguards,
-* and pragmatic AI-assisted workflows.
+That is why the implementation emphasizes deterministic safeguards, clean validation, confidence scoring, escalation routing, and graceful degradation. In hospitality messaging, a safe non-answer with human review is often better than a confident automated mistake.
