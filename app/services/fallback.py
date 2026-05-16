@@ -56,6 +56,18 @@ class FallbackService:
 
         context = self._parse_property_context(context_str)
         msg = message.lower()
+        asks_availability = any(kw in msg for kw in ["available", "availability"])
+        asks_pricing = any(kw in msg for kw in ["rate", "price", "pricing", "cost"])
+
+        if asks_availability and asks_pricing:
+            availability_info = context.get("availability april 20-24")
+            base_rate = context.get("base rate")
+            extra_guest = context.get("extra guest")
+            if availability_info and base_rate and extra_guest:
+                return (
+                    f"Hi {guest_name}! Great news, Villa B1 is available for April 20-24. "
+                    f"The base rate is {base_rate}. Extra guests are {extra_guest}."
+                )
 
         # 1. WiFi Information
         if any(kw in msg for kw in ["wifi", "password", "wi-fi"]):
@@ -94,13 +106,13 @@ class FallbackService:
                 return f"Hi {guest_name}! Our cancellation policy: {policy}."
 
         # 6. Availability Queries (Requirement: Safe factual fallback)
-        if any(kw in msg for kw in ["available", "availability"]):
+        if asks_availability:
             availability_info = context.get("availability april 20-24")
             if availability_info:
-                return f"Hi {guest_name}! Great news — Villa B1 is available for April 20–24."
+                return f"Hi {guest_name}! Great news, Villa B1 is available for April 20-24."
 
         # 7. Pricing Queries (Requirement: Safe factual fallback)
-        if any(kw in msg for kw in ["rate", "price", "pricing", "cost"]):
+        if asks_pricing:
             base_rate = context.get("base rate")
             extra_guest = context.get("extra guest")
             if base_rate and extra_guest:

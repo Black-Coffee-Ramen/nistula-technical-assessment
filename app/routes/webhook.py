@@ -72,9 +72,22 @@ async def handle_message(request: WebhookRequest):
     # Graceful Degradation Logic
     if not claude_success:
         # Check if we can safely provide a deterministic factual answer
-        is_factual = query_type in [QueryType.POST_SALES_CHECKIN, QueryType.GENERAL_ENQUIRY]
+        factual_fallback_types = {
+            QueryType.POST_SALES_CHECKIN,
+            QueryType.GENERAL_ENQUIRY,
+            QueryType.PRE_SALES_AVAILABILITY,
+            QueryType.PRE_SALES_PRICING,
+        }
+        is_factual = query_type in factual_fallback_types
+        is_safe_mixed_presales = (
+            is_mixed
+            and query_type in {
+                QueryType.PRE_SALES_AVAILABILITY,
+                QueryType.PRE_SALES_PRICING,
+            }
+        )
         
-        if is_factual and not is_mixed:
+        if is_factual and (not is_mixed or is_safe_mixed_presales):
             logger.info(f"{log_prefix} Claude failure. Attempting deterministic factual fallback.")
             deterministic_reply = fallback_service.generate_deterministic_response(
                 message=normalized.message_text,
