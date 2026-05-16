@@ -10,7 +10,6 @@ Hang tight, help is already moving.  🙏 ”
 
 I chose this wording because at 3am the guest mainly needs reassurance, urgency, and a sense that someone is already taking responsibility. The tone is warm and direct, not robotic, and it avoids making refund promises before a human has reviewed the situation.
 
---
 
 ## Question B — System Design
 
@@ -19,8 +18,6 @@ The system should log the complaint category, timestamp, booking details, escala
 If nobody responds within 30 minutes, the system should automatically escalate the case to a secondary manager and continue alerting until someone acknowledges it. The reservation should also be marked internally as a critical issue so any staff member who views it immediately understands the urgency.
 The goal is to make sure late-night complaints are handled quickly and do not depend on one person seeing the message.
 
-
----
 
 ## Question C — The Learning
 
