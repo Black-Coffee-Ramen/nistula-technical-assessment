@@ -162,7 +162,8 @@ The system still runs without a working Claude balance because it includes grace
 ### 1. Clone or Open the Project
 
 ```bash
-cd "C:\Users\athiy\Downloads\Semester-8\Personal Projects\nistula-technical-assessment"
+git clone https://github.com/Black-Coffee-Ramen/nistula-technical-assessment.git
+cd nistula-technical-assessment
 ```
 
 If you are running on macOS or Linux, use the equivalent path where the project is stored.
