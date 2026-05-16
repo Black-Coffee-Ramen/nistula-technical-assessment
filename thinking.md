@@ -25,4 +25,3 @@ A third hot water complaint in two months means this is no longer a one-time iss
 The platform should detect repeated complaints by property and issue type, then automatically flag Villa B1 for preventive maintenance before the next check-in.
 I would build a simple trend and risk-scoring system that tracks complaint frequency, maintenance history, resolution time, and guest sentiment across properties.
 If the same issue keeps crossing a threshold, the system should trigger preventive workflows such as boiler inspection, plumbing checks, or equipment replacement instead of waiting for another guest to complain.
-
