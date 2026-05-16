@@ -1,6 +1,7 @@
 from enum import Enum
 
 class MessageSource(str, Enum):
+    """Supported inbound communication channels."""
     WHATSAPP = "whatsapp"
     BOOKING_COM = "booking_com"
     AIRBNB = "airbnb"
@@ -8,6 +9,7 @@ class MessageSource(str, Enum):
     DIRECT = "direct"
 
 class QueryType(str, Enum):
+    """Categorization of guest message intent."""
     PRE_SALES_AVAILABILITY = "pre_sales_availability"
     PRE_SALES_PRICING = "pre_sales_pricing"
     POST_SALES_CHECKIN = "post_sales_checkin"
@@ -16,11 +18,12 @@ class QueryType(str, Enum):
     GENERAL_ENQUIRY = "general_enquiry"
 
 class ActionDecision(str, Enum):
+    """Recommended system actions based on classification and confidence."""
     AUTO_SEND = "auto_send"
     AGENT_REVIEW = "agent_review"
     ESCALATE = "escalate"
 
-# Property Context
+# --- Property Context ---
 PROPERTY_ID_VILLA_B1 = "villa-b1"
 PROPERTY_CONTEXT_VILLA_B1 = """
 Property: Villa B1, Assagao, North Goa
@@ -38,10 +41,15 @@ Availability April 20-24: Available
 Cancellation: Free up to 7 days before check-in
 """
 
-# Property Context Map
 PROPERTY_CONTEXT_MAP = {
     PROPERTY_ID_VILLA_B1: PROPERTY_CONTEXT_VILLA_B1,
 }
+
+# --- Operational Safety Config ---
+
+# Base confidence scores for different query types.
+# Factual queries like check-in/out start with higher confidence.
+# Critical intents like complaints start low to force human oversight.
 BASE_CONFIDENCE = {
     QueryType.POST_SALES_CHECKIN: 0.95,
     QueryType.PRE_SALES_AVAILABILITY: 0.90,
@@ -51,6 +59,11 @@ BASE_CONFIDENCE = {
     QueryType.COMPLAINT: 0.40,
 }
 
-# Thresholds
+# Action Thresholds
+# Scores above 0.85 are considered safe for automated responses.
 AUTO_SEND_THRESHOLD = 0.85
+
+# Scores between 0.60 and 0.85 are routed for agent review.
+# Note: In the current implementation, any score below 0.85 defaults to review 
+# unless it's a complaint (which escalates).
 AGENT_REVIEW_THRESHOLD = 0.60

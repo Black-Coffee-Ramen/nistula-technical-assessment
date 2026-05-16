@@ -1,0 +1,53 @@
+{
+  "source": "instagram",
+  "guest_name": "Noah Walker",
+  "message": "What is the WiFi password?",
+  "timestamp": "2026-05-09T10:00:00Z",
+  "booking_ref": "NIS-2024-0925",
+  "property_id": "villa-b1"
+}
+
+{
+  "source": "whatsapp",
+  "guest_name": "Critical Guest",
+  "message": "The AC is broken and this is unacceptable.",
+  "timestamp": "2026-05-10T15:00:00Z",
+  "booking_ref": "NIS-2024-0970",
+  "property_id": "villa-b1"
+}
+
+{
+  "source": "instagram",
+  "guest_name": "Noah Walker",
+  "message": "Can we check in early and what is the WiFi password?",
+  "timestamp": "2026-05-09T10:00:00Z",
+  "booking_ref": "NIS-2024-0925",
+  "property_id": "villa-b1"
+}
+
+{
+  "source": "direct",
+  "guest_name": "Daniel Scott",
+  "message": "What would the total price be for 6 guests?",
+  "timestamp": "2026-05-10T13:00:00Z",
+  "booking_ref": "NIS-2024-0960",
+  "property_id": "villa-b1"
+}
+
+{
+  "source": "whatsapp",
+  "guest_name": "Test User",
+  "message": "Hello",
+  "timestamp": "2026-05-05T10:30:00Z",
+  "booking_ref": "NIS-2024-0891",
+  "property_id": "villa-x9"
+}
+
+{
+  "source": "airbnb",
+  "guest_name": "Emma",
+  "message": "whts da wifi pasword?",
+  "timestamp": "2026-05-11T09:00:00Z",
+  "booking_ref": "NIS-2024-0988",
+  "property_id": "villa-b1"
+}

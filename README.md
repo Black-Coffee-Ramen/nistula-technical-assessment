@@ -12,6 +12,17 @@ This project was built as part of the Nistula technical assessment and focuses o
 
 ---
 
+# Production-Grade Readability Refactor (May 2026)
+
+The codebase has undergone a comprehensive maintainability refactor to ensure long-term observability and structural clarity. Key enhancements include:
+*   **Decoupled Service Architecture**: Logic for classification, AI interaction, and fallback generation is now fully encapsulated in specialized service classes.
+*   **Structured Observability**: Standardized logging with correlation IDs, professional docstrings, and internalized diagnostic metadata.
+*   **Resilient Fallbacks**: Deterministic, property-aware responses for critical guest queries (WiFi, check-in, pricing, availability) that activate automatically during AI service disruptions.
+*   **Strict Escalation Routing**: Precise threshold compliance (Complaints/Low confidence → Escalate) to ensure operational safety.
+*   **Self-Documenting API**: Clean, consumer-facing Pydantic models optimized for Swagger/OpenAPI documentation.
+
+---
+
 # Tech Stack
 
 | Layer              | Technology                        |

@@ -12,11 +12,8 @@ class WebhookRequest(BaseModel):
     property_id: str
 
 class WebhookResponse(BaseModel):
-    message_id: str
-    query_type: QueryType
-    drafted_reply: str
-    confidence_score: float
-    action: ActionDecision
-    failure_type: Optional[str] = None
-    is_fallback: bool = False
-    fallback_reason: Optional[str] = None
+    message_id: str = Field(..., description="Unique correlation ID for the message lifecycle")
+    query_type: QueryType = Field(..., description="Primary detected intent of the guest message")
+    drafted_reply: str = Field(..., description="The AI-generated or deterministic hospitality response")
+    confidence_score: float = Field(..., description="System confidence in the drafted reply (0.0 to 1.0)")
+    action: ActionDecision = Field(..., description="Recommended operational action (auto_send, agent_review, escalate)")
