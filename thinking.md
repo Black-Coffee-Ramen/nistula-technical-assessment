@@ -2,35 +2,32 @@
 
 ## Question A — Immediate Response
 
-“Hi, I’m very sorry about the inconvenience, especially this late at night. I’ve alerted the on-call support and maintenance team immediately so they can investigate the hot water issue as a priority. We understand the urgency with your guests arriving in the morning, and someone from our team will contact you shortly with an update.”
+“Hi, I’m really sorry about this especially at this hour, and with guests arriving soon.
+I’ve already flagged this as urgent and notified our on-call team. Someone will reach out to you within the next 20 minutes. We also have a backup hot water option we can try for your villa right away, and if that still doesn’t fully solve it before your guests arrive, we’ll make sure it is handled fairly.
+I understand your request for a refund, and that is completely fair. Our team will speak with you directly about that.
+Hang tight, help is already moving.  🙏 ”
 
-I chose this wording because the first priority at 3am is to calm the guest and show that action is already being taken. This response acknowledges the frustration without sounding defensive and avoids making refund promises that the AI should not decide automatically.
 
----
+I chose this wording because at 3am the guest mainly needs reassurance, urgency, and a sense that someone is already taking responsibility. The tone is warm and direct, not robotic, and it avoids making refund promises before a human has reviewed the situation.
+
+--
 
 ## Question B — System Design
 
-Beyond replying to messages, as soon as the message arrives, the system should classify it as a high priority operational complaint because it affects guest experience and upcoming hospitality operations. An urgent incident ticket should be created automatically.
-
-The system should notify the on call operations manager, maintenance staff, and backup escalation contact through SMS, WhatsApp, push notification, or automated calls. The ticket should include booking details, timestamps, villa information, previous complaint history, and the full conversation thread.
-
-The platform should also log important metadata like complaint category, AI confidence score, escalation reason, response timestamps, and whether human intervention was required.
-
-If no human acknowledges the issue within 30 minutes, the system should automatically escalate the case to a secondary manager and trigger repeated alerts every few minutes until someone responds. Internally, the reservation should also be marked as a critical operational issue so future staff immediately see its priority level.
-
-This creates accountability and reduces the risk of late night complaints being ignored.
+The platform should immediately flag this as a high-priority operational issue and create an urgent incident ticket. At the same time, it should notify the on-call maintenance staff, operations manager, and backup escalation contacts through WhatsApp, SMS, push notifications, or automated calls.
+The system should log the complaint category, timestamp, booking details, escalation reason, AI confidence score, and full conversation history for tracking and review.
+If nobody responds within 30 minutes, the system should automatically escalate the case to a secondary manager and continue alerting until someone acknowledges it. The reservation should also be marked internally as a critical issue so any staff member who views it immediately understands the urgency.
+The goal is to make sure late-night complaints are handled quickly and do not depend on one person seeing the message.
 
 
 ---
 
 ## Question C — The Learning
 
-A third hot water complaint in two months shows this is no longer an isolated incident. It is a recurring operational failure.
+A third hot water complaint in two months means this is no longer a one-time issue. It is a recurring operational problem.
+The platform should detect repeated complaints by property and issue type, then automatically flag Villa B1 for preventive maintenance before the next check-in.
+I would build a simple trend and risk-scoring system that tracks complaint frequency, maintenance history, resolution time, and guest sentiment across properties.
+If the same issue keeps crossing a threshold, the system should trigger preventive workflows such as boiler inspection, plumbing checks, or equipment replacement instead of waiting for another guest to complain.
+If you want, I can also make this sound a little more formal and assessment-ready while keeping it human.
 
-The system should automatically detect repeated complaint patterns by property and issue type. Villa B1 should immediately receive a maintenance risk flag and require preventive inspection before the next guest check in.
 
-I would build a lightweight issue trend and risk scoring system. It would track complaint frequency, maintenance history, resolution time, and guest sentiment across all properties.
-
-If the same issue crosses a threshold, the platform should automatically create preventive maintenance workflows instead of waiting for another guest complaint. In this case, the system could schedule boiler inspection, plumbing checks, or equipment replacement before the problem happens again.
-
-The goal is not only to respond faster but to reduce repeat operational failures completely.
